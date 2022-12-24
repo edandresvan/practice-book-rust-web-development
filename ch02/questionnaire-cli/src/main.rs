@@ -1,8 +1,4 @@
-use std::{
-  io::{Error, ErrorKind},
-  str::FromStr,
-  vec,
-};
+use std::str::FromStr;
 
 #[derive(Debug)]
 struct QuestionId(String);
@@ -22,7 +18,10 @@ impl std::str::FromStr for QuestionId {
   fn from_str(id: &str) -> Result<Self, Self::Err> {
     match id.is_empty() {
       false => Ok(QuestionId(id.to_string())),
-      true => Err(Error::new(ErrorKind::InvalidInput, "No id provided")),
+      true => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        "No ID provided",
+      )),
     }
   }
 }
@@ -58,11 +57,8 @@ impl std::fmt::Display for Question {
   ) -> std::fmt::Result {
     write!(
       f,
-      "{id}, title: {title}, content{content}, tags: {tags:?}",
-      id = self.id,
-      title = self.title,
-      content = self.content,
-      tags = self.tags
+      "{}, title: {}, content: {}, tags: {:?}",
+      self.id, self.title, self.content, self.tags
     )
   }
 }
@@ -77,23 +73,11 @@ impl std::fmt::Display for Question {
 // }
 
 fn main() {
-  let question_1a: Question = Question::new(
-    QuestionId("1".to_string()),
-    "First Question".to_string(),
-    "Content of question".to_string(),
-    Some(vec!["fag".to_string()]),
-  );
-  println!("{}", question_1a);
-  println!("......");
-  println!("{:?}", question_1a);
-
-  let question_1b: Question = Question::new(
-    QuestionId::from_str("1").expect("No id provided"),
+  let question = Question::new(
+    QuestionId::from_str("1").expect("No ID provided."),
     "First Question".to_string(),
     "Content of question".to_string(),
     Some(vec!["faq".to_string()]),
   );
-
-  println!("......");
-  println!("{:?}", question_1b);
+  println!("{:?}", &question);
 }

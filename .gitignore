@@ -1,6 +1,12 @@
 # Created by https://www.toptal.com/developers/gitignore/api/ssh,osx,sass,rust,ruby,node,less,lamp,java,adobe,linux,macos,putty,gradle,python,vagrant,windows,eclipse,android,netbeans,homebrew,terraform,notepadpp,chocolatey,powershell,libreoffice,monodevelop,visualstudio,jetbrains+all,microsoftoffice,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=ssh,osx,sass,rust,ruby,node,less,lamp,java,adobe,linux,macos,putty,gradle,python,vagrant,windows,eclipse,android,netbeans,homebrew,terraform,notepadpp,chocolatey,powershell,libreoffice,monodevelop,visualstudio,jetbrains+all,microsoftoffice,visualstudiocode
 
+
+### Profiling tools
+perf.data
+script.perf
+strace.txt
+
 ### Adobe ###
 # Adobe Source Files
 *.psd
