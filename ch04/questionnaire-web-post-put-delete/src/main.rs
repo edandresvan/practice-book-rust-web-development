@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use warp::filters::body::BodyDeserializeError;
 use warp::filters::cors::CorsForbidden;
 use warp::http::Method;
 use warp::http::StatusCode;
@@ -68,7 +69,7 @@ impl std::fmt::Display for Question {
   }
 }
 
-/// Get a set of questions from the given parameters and data store.
+/// Gets a set of questions from the given parameters and data store.
 ///
 /// # Arguments
 ///
@@ -95,6 +96,12 @@ async fn get_questions(
   }
 }
 
+/// Adds a new question to the given data store.
+///
+/// # Arguments
+///
+/// * `store`: Data store that contains all the questions.
+/// * `question`: Question to add to the data store.
 async fn add_question(
   store: Store,
   question: Question,
@@ -106,6 +113,50 @@ async fn add_question(
     .insert(question.id.clone(), question);
 
   Ok(warp::reply::with_status("Question added", StatusCode::OK))
+}
+
+/// Updates an existing question with the given the ID and data store.
+///
+/// # Arguments
+///
+/// * `id`: ID (unique identifier) of the question to be updated.
+/// * `store`: Data store that contains all the questions.
+/// * `question`: Question to add to the data store.
+async fn update_question(
+  id: String,
+  store: Store,
+  question: Question,
+) -> Result<impl warp::Reply, warp::Rejection> {
+  match store.questions.write().await.get_mut(&QuestionId(id)) {
+    Some(q) => {
+      *q = question;
+      return Ok(warp::reply::with_status("Question updated", StatusCode::OK));
+    }
+    None => return Err(warp::reject::custom(Error::QuestionNotFound)),
+  }
+}
+
+/// Deletes an existing question with the given the ID and data store.
+///
+/// # Arguments
+///
+/// * `id`: ID (unique identifier) of the question to be deleted.
+/// * `store`: Data store that contains all the questions.
+async fn delete_question(
+  id: String,
+  store: Store,
+) -> Result<impl warp::Reply, warp::Rejection> {
+  match store.questions.write().await.remove(&QuestionId(id)) {
+    Some(_) => {
+      return Ok(warp::reply::with_status(
+        "Question deleted.",
+        StatusCode::OK,
+      ));
+    }
+    None => {
+      return Err(warp::reject::custom(Error::QuestionNotFound));
+    }
+  }
 }
 
 /// Represents the start and end index of a set of results.
@@ -163,6 +214,8 @@ enum Error {
   ParseError(std::num::ParseIntError),
   /// A kind of error for missing parameters.
   MissingParameters,
+  /// A kind of error for questions not found.
+  QuestionNotFound,
 }
 
 impl std::fmt::Display for Error {
@@ -174,7 +227,8 @@ impl std::fmt::Display for Error {
       Error::ParseError(ref err) => {
         write!(f, "Cannot parse the parameter: {}", err)
       }
-      Error::MissingParameters => write!(f, "Missing parameter"),
+      Error::MissingParameters => write!(f, "Missing parameter."),
+      Error::QuestionNotFound => write!(f, "Question not found."),
     }
   }
 }
@@ -189,16 +243,37 @@ impl Reject for Error {}
 async fn return_error(rej: Rejection) -> Result<impl Reply, Rejection> {
   // Handle operations errors
   if let Some(error) = rej.find::<Error>() {
-    Ok(warp::reply::with_status(
-      error.to_string(),
-      StatusCode::RANGE_NOT_SATISFIABLE,
-    ))
+    match error {
+      Error::QuestionNotFound => Ok(warp::reply::with_status(
+        error.to_string(),
+        StatusCode::NOT_FOUND,
+      )),
+      Error::MissingParameters => Ok(warp::reply::with_status(
+        error.to_string(),
+        StatusCode::BAD_REQUEST,
+      )),
+      Error::ParseError(_) => Ok(warp::reply::with_status(
+        error.to_string(),
+        StatusCode::BAD_REQUEST,
+      )),
+      _ => Ok(warp::reply::with_status(
+        error.to_string(),
+        StatusCode::RANGE_NOT_SATISFIABLE,
+      )),
+    }
   }
   // Handle CORS errors
   else if let Some(error) = rej.find::<CorsForbidden>() {
     Ok(warp::reply::with_status(
       error.to_string(),
       StatusCode::FORBIDDEN,
+    ))
+  }
+  // Handle malformed HTTP Bodies
+  else if let Some(error) = rej.find::<BodyDeserializeError>() {
+    Ok(warp::reply::with_status(
+      error.to_string(),
+      StatusCode::UNPROCESSABLE_ENTITY,
     ))
   }
   // At this point, the possible rejection is that a path not found
@@ -256,8 +331,25 @@ async fn main() {
     .and(warp::body::json())
     .and_then(add_question);
 
+  let update_question = warp::put()
+    .and(warp::path("questions"))
+    .and(warp::path::param::<String>())
+    .and(warp::path::end())
+    .and(store_filter.clone())
+    .and(warp::body::json())
+    .and_then(update_question);
+
+  let delete_question = warp::delete()
+    .and(warp::path("questions"))
+    .and(warp::path::param::<String>())
+    .and(warp::path::end())
+    .and(store_filter.clone())
+    .and_then(delete_question);
+
   let routes = get_questions
     .or(add_question)
+    .or(update_question)
+    .or(delete_question)
     .with(cors)
     .recover(return_error);
 
