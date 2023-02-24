@@ -73,7 +73,7 @@ impl std::fmt::Display for Question {
 ///
 /// # Arguments
 ///
-/// * `params`: Parameters for refining the set of questions to retrieve.
+/// * `params`: Parameters to filter the set of questions to retrieve.
 /// * `store`: Data store that contains all the questions.
 async fn get_questions(
   params: HashMap<String, String>,
@@ -87,8 +87,11 @@ async fn get_questions(
     if pagination.end > data.len() {
       pagination.end = data.len();
     }
+    if pagination.start < 1  {
+      pagination.start = 1;
+    }
     // Retrieve the result set as a slice of elements between the start and end indexes.
-    let result_set: &[Question] = &data[pagination.start..pagination.end];
+    let result_set: &[Question] = &data[(pagination.start - 1)..pagination.end];
     Ok(warp::reply::json(&result_set))
   } else {
     let data: Vec<Question> = store.questions.read().await.values().cloned().collect();
@@ -113,7 +116,7 @@ async fn add_question(
     .insert(question.id.clone(), question);
 
   Ok(warp::reply::with_status("Question added", StatusCode::OK))
-}
+} // end fn add_question()
 
 /// Updates an existing question with the given the ID and data store.
 ///
@@ -130,11 +133,11 @@ async fn update_question(
   match store.questions.write().await.get_mut(&QuestionId(id)) {
     Some(q) => {
       *q = question;
-      return Ok(warp::reply::with_status("Question updated", StatusCode::OK));
-    }
-    None => return Err(warp::reject::custom(Error::QuestionNotFound)),
+      Ok(warp::reply::with_status("Question updated", StatusCode::OK))
+    },
+    None => Err(warp::reject::custom(QError::QuestionNotFound)),
   }
-}
+} // end fn update_question()
 
 /// Deletes an existing question with the given the ID and data store.
 ///
@@ -148,16 +151,16 @@ async fn delete_question(
 ) -> Result<impl warp::Reply, warp::Rejection> {
   match store.questions.write().await.remove(&QuestionId(id)) {
     Some(_) => {
-      return Ok(warp::reply::with_status(
+      Ok(warp::reply::with_status(
         "Question deleted.",
         StatusCode::OK,
-      ));
-    }
+      ))
+    },
     None => {
-      return Err(warp::reject::custom(Error::QuestionNotFound));
+      Err(warp::reject::custom(QError::QuestionNotFound))
     }
   }
-}
+} // fn delete_question()
 
 /// Represents the unique identifier (ID) of an answer.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
@@ -172,7 +175,7 @@ struct Answer {
   content: String,
   /// Unique identifier (ID) of the question this answer belongs to.
   question_id: QuestionId,
-}
+} // end struct Answer
 
 /// Adds a new answer with the given parameters to a data store.
 ///
@@ -197,7 +200,7 @@ async fn add_answer(
     .insert(answer.id.clone(), answer);
 
   Ok(warp::reply::with_status("Answer added", StatusCode::OK))
-}
+} // end fn add_answer()
 
 /// Represents the start and end index of a set of results.
 #[derive(Debug)]
@@ -206,7 +209,7 @@ struct Pagination {
   start: usize,
   /// End index of a set of results.
   end: usize,
-}
+} // end struct Pagination
 
 /// Gets a pagination object from the given set of parameters.
 ///
@@ -214,20 +217,20 @@ struct Pagination {
 ///
 /// # Arguments
 ///
-/// * `params`: Parameters for refining the set of results to retrieve.
+/// * `params`: Parameters to limit the set of results to retrieve.
 ///
-fn extract_pagination(params: HashMap<String, String>) -> Result<Pagination, Error> {
+fn extract_pagination(params: HashMap<String, String>) -> Result<Pagination, QError> {
   if params.contains_key("start") && params.contains_key("end") {
     let start_index: usize = params
       .get("start")
       .unwrap()
       .parse::<usize>()
-      .map_err(Error::ParseError)?;
+      .map_err(QError::ParseError)?;
     let end_index: usize = params
       .get("end")
       .unwrap()
       .parse::<usize>()
-      .map_err(Error::ParseError)?;
+      .map_err(QError::ParseError)?;
 
     // Swap start and end indexes if the start index is greater than the end index
     let (start_index, end_index) = if start_index > end_index {
@@ -244,36 +247,36 @@ fn extract_pagination(params: HashMap<String, String>) -> Result<Pagination, Err
     return Ok(pagination);
   }
 
-  Err(Error::MissingParameters)
-}
+  Err(QError::MissingParameters)
+} // end fn extract_pagination()
 
 /// Represents an error for processing query parameters.
 #[derive(Debug)]
-enum Error {
+enum QError {
   /// An kind of error for parsing errors.
   ParseError(std::num::ParseIntError),
   /// A kind of error for missing parameters.
   MissingParameters,
   /// A kind of error for questions not found.
   QuestionNotFound,
-}
+} // end enum QError
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for QError {
   fn fmt(
     &self,
     f: &mut std::fmt::Formatter<'_>,
   ) -> std::fmt::Result {
     match *self {
-      Error::ParseError(ref err) => {
+      QError::ParseError(ref err) => {
         write!(f, "Cannot parse the parameter: {}", err)
       }
-      Error::MissingParameters => write!(f, "Missing parameter."),
-      Error::QuestionNotFound => write!(f, "Question not found."),
+      QError::MissingParameters => write!(f, "Missing parameter."),
+      QError::QuestionNotFound => write!(f, "Question not found."),
     }
   }
 }
 
-impl Reject for Error {}
+impl Reject for QError {}
 
 /// Returns a Warp error reply for the given rejection.
 ///
@@ -282,24 +285,28 @@ impl Reject for Error {}
 /// * `rej`: Warp rejection object containing an error that happened.
 async fn return_error(rej: Rejection) -> Result<impl Reply, Rejection> {
   // Handle operations errors
-  if let Some(error) = rej.find::<Error>() {
+  if let Some(error) = rej.find::<QError>() {
     match error {
-      Error::QuestionNotFound => Ok(warp::reply::with_status(
+      QError::QuestionNotFound => Ok(warp::reply::with_status(
         error.to_string(),
         StatusCode::NOT_FOUND,
       )),
-      Error::MissingParameters => Ok(warp::reply::with_status(
+      QError::MissingParameters => Ok(warp::reply::with_status(
         error.to_string(),
         StatusCode::BAD_REQUEST,
       )),
-      Error::ParseError(_) => Ok(warp::reply::with_status(
+      QError::ParseError(_) => Ok(warp::reply::with_status(
         error.to_string(),
         StatusCode::BAD_REQUEST,
       )),
-      _ => Ok(warp::reply::with_status(
-        error.to_string(),
-        StatusCode::RANGE_NOT_SATISFIABLE,
-      )),
+      // _ => Ok(warp::reply::with_status(
+      //   error.to_string(),
+      //   StatusCode::RANGE_NOT_SATISFIABLE,
+      // )),
+      // _ => Ok(warp::reply::with_status(
+      //   error.to_string(),
+      //   StatusCode::NOT_FOUND,
+      // )),
     }
   }
   // Handle CORS errors
@@ -323,15 +330,16 @@ async fn return_error(rej: Rejection) -> Result<impl Reply, Rejection> {
       StatusCode::NOT_FOUND,
     ))
   }
-}
+} // end fn return_error()
 
 /// Represents the data store for the application.
 #[derive(Clone)]
 struct Store {
   /// Collection of questions in the data store.
   questions: Arc<RwLock<HashMap<QuestionId, Question>>>,
+  /// Collection of answers in the data store.
   answers: Arc<RwLock<HashMap<AnswerId, Answer>>>,
-}
+} // end struct Store
 
 impl Store {
   /// Creates a new data store.
@@ -340,13 +348,13 @@ impl Store {
       questions: Arc::new(RwLock::new(Self::init())),
       answers: Arc::new(RwLock::new(HashMap::new())),
     }
-  }
+  } // end fn new()
 
   /// Initializes the data store with available data.
   fn init() -> HashMap<QuestionId, Question> {
-    let file = include_str!("../questions.json");
+    let file: &str = include_str!("../questions.json");
     serde_json::from_str(file).expect("cannot read the questions.json file.")
-  }
+  } // end fn init()
 }
 
 #[tokio::main]
@@ -362,8 +370,8 @@ async fn main() {
   let get_questions = warp::get()
     .and(warp::path("questions"))
     .and(warp::path::end())
-    .and(warp::query())
-    .and(store_filter.clone())
+    .and(warp::query()) // adds a hash map of query parameters to the function specified in the last 'and_then()'
+    .and(store_filter.clone()) // clone this filter
     .and_then(get_questions);
 
   let add_question = warp::post()
@@ -378,7 +386,7 @@ async fn main() {
     .and(warp::path::param::<String>())
     .and(warp::path::end())
     .and(store_filter.clone())
-    .and(warp::body::json())
+    .and(warp::body::json()) // JSON Body with the question data.
     .and_then(update_question);
 
   let delete_question = warp::delete()
