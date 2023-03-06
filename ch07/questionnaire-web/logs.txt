@@ -1,0 +1,11 @@
+    Finished dev [unoptimized + debuginfo] target(s) in 0.06s
+     Running `target/debug/questionnaire-web`
+[2023-02-26T18:48:12Z ERROR questionnaire_web] this error
+[2023-02-26T18:48:12Z INFO  questionnaire_web] this info
+[2023-02-26T18:48:12Z WARN  questionnaire_web] this warning
+[2023-02-26T18:48:12Z INFO  warp::server] Server::run; addr=127.0.0.1:3030
+[2023-02-26T18:48:12Z INFO  warp::server] listening on http://127.0.0.1:3030
+[2023-02-26T18:48:36Z DEBUG hyper::proto::h1::io] parsed 3 headers
+[2023-02-26T18:48:36Z DEBUG hyper::proto::h1::conn] incoming body is empty
+[2023-02-26T18:48:36Z DEBUG warp::filters::query] route was called without a query string, defaulting to empty
+[2023-02-26T18:48:36Z DEBUG hyper::proto::h1::io] flushed 1137 bytes
