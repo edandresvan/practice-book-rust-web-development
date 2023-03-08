@@ -21,7 +21,7 @@ async fn main() {
   // Filter configured with a log level in this case 'error'.
   // Note first the crate name
   let log_filter = std::env::var("RUST_LOG")
-    .unwrap_or_else(|_| "questionnaire_web=info,warp=error".to_owned());
+    .unwrap_or_else(|_| "handle_errors=warn,questionnaire_web=info,warp=error".to_owned());
 
   // Start the tracing subscriber
   tracing_subscriber::fmt()
@@ -34,7 +34,15 @@ async fn main() {
   // Create the data store
   let url: &str = "postgres://firstdev:mypassword@localhost:5432/rustwebdev";
   let store = Store::new(url).await;
+
+  // Execute the database migrations
+  sqlx::migrate!().run(&store.clone().connection)
+  .await.expect("cannot run migration");
+
+  // Create a warp filter for the warp requests
   let store_filter = warp::any().map(move || store.clone());
+
+  
 
   let cors = warp::cors()
     .allow_any_origin()
@@ -91,5 +99,5 @@ async fn main() {
     .with(warp::trace::request())
     .recover(return_error);
 
-  warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+  warp::serve(routes).run(([127, 0, 0, 1], 3030)).await
 }

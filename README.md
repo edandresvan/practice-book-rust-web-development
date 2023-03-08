@@ -74,11 +74,23 @@ $ podman run --interactive --publish 5432:5432 --volume questionnaire_volume:/va
 
 ## Execute PostgreSQL Scripts
 
+Up to section 7.5, you can execute the SQL script `create-database.sql` to create the data structures.
+
 ```bash
 $ cd db-scripts;
-$ psql --host=localhost --port=5432 --dbname=rustwebdev --username=firstdev --password --file=database.sql;
+$ psql --host=localhost --port=5432 --dbname=rustwebdev --username=firstdev --password --file=create-database.sql;
 
 ```
+
+From section 7.6, you can work with SQL migrations. First, delete the existing data structures:
+
+```bash
+$ cd db-scripts;
+$ psql --host=localhost --port=5432 --dbname=rustwebdev --username=firstdev --password --file=drop-database.sql;
+
+```
+
+
 
 
 

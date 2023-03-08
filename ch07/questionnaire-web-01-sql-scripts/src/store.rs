@@ -76,7 +76,7 @@ impl Store {
   pub async fn add_question(
     &self,
     question: NewQuestion,
-  ) -> Result<Vec<Question>, sqlx::Error> {
+  ) -> Result<Vec<Question>, QError> {
     match sqlx::query(
       r#"INSERT INTO questions (title, content, tags) 
       VALUES ($1, $2, $3) 
@@ -95,7 +95,10 @@ impl Store {
     .await
     {
       Ok(questions) => Ok(questions),
-      Err(err) => Err(err),
+      Err(err) => {
+        tracing::event!(tracing::Level::ERROR, "{:?}", err);
+        Err(QError::DatabaseQueryError(err))
+      }
     }
   } // end fn add_question()
 
@@ -109,7 +112,7 @@ impl Store {
     &self,
     question: Question,
     id: i32,
-  ) -> Result<Vec<Question>, sqlx::Error> {
+  ) -> Result<Vec<Question>, QError> {
     match sqlx::query(
       r#"UPDATE questions 
       SET title = $1, content = $2, tags = $3 
@@ -130,7 +133,10 @@ impl Store {
     .await
     {
       Ok(questions) => Ok(questions),
-      Err(err) => Err(err),
+      Err(err) => {
+        tracing::event!(tracing::Level::ERROR, "{:?}", err);
+        Err(QError::DatabaseQueryError(err))
+      }
     }
   } // end fn update_question()
 
@@ -142,7 +148,7 @@ impl Store {
   pub async fn delete_question(
     &self,
     id: i32,
-  ) -> Result<u64, sqlx::Error> {
+  ) -> Result<u64, QError> {
     match sqlx::query(
       r#"DELETE FROM questions 
       WHERE id = $1"#,
@@ -152,7 +158,10 @@ impl Store {
     .await
     {
       Ok(result) => Ok(result.rows_affected()),
-      Err(err) => Err(err),
+      Err(err) => {
+        tracing::event!(tracing::Level::ERROR, "{:?}", err);
+        Err(QError::DatabaseQueryError(err))
+      }
     }
   } // end fn delete_question()
 

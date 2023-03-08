@@ -60,7 +60,7 @@ pub async fn add_question(
       warp::reply::json(&questions),
       StatusCode::CREATED,
     )),
-    Err(err) => Err(warp::reject::custom(QError::DatabaseQueryError(err))),
+    Err(err) => Err(warp::reject::custom(err)),
   }
 } // end fn add_question()
 
@@ -81,7 +81,7 @@ pub async fn update_question(
       warp::reply::json(&questions),
       StatusCode::OK,
     )),
-    Err(err) => Err(warp::reject::custom(QError::DatabaseQueryError(err))),
+    Err(err) => Err(warp::reject::custom(err)),
   }
 } // end fn update_question()
 
@@ -102,6 +102,6 @@ pub async fn delete_question(
     )),
     Ok(0) => Err(warp::reject::custom(QError::QuestionNotFound)),
 
-    Err(err) => Err(warp::reject::custom(QError::DatabaseQueryError(err))),
+    Err(err) => Err(warp::reject::custom(err)),
   }
 } // fn delete_question()

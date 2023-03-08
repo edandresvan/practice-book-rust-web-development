@@ -1,3 +1,4 @@
+use tracing::{event, instrument, Level};
 use warp::filters::body::BodyDeserializeError;
 use warp::filters::cors::CorsForbidden;
 use warp::hyper::StatusCode;
@@ -40,6 +41,7 @@ impl Reject for QError {}
 /// # Arguments
 ///
 /// * `rej`: Warp rejection object containing an error that happened.
+#[instrument]
 pub async fn return_error(rej: Rejection) -> Result<impl Reply, Rejection> {
   // Handle operations errors
   if let Some(error) = rej.find::<QError>() {
@@ -56,10 +58,13 @@ pub async fn return_error(rej: Rejection) -> Result<impl Reply, Rejection> {
         error.to_string(),
         StatusCode::BAD_REQUEST,
       )),
-      QError::DatabaseQueryError(err) => Ok(warp::reply::with_status(
-        err.to_string(),
-        StatusCode::BAD_REQUEST,
-      )),
+      QError::DatabaseQueryError(err) => {
+        event!(Level::ERROR, "{}", format!("Database query error. {}", error));
+        Ok(warp::reply::with_status(
+          err.to_string(),
+          StatusCode::BAD_REQUEST,
+        ))
+      }
       // _ => Ok(warp::reply::with_status(
       //   error.to_string(),
       //   StatusCode::RANGE_NOT_SATISFIABLE,
