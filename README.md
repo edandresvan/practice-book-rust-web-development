@@ -74,6 +74,8 @@ $ podman run --interactive --publish 5432:5432 --volume questionnaire_volume:/va
 
 ## Execute PostgreSQL Scripts
 
+### Sections 7.1 to 7.5
+
 Up to section 7.5, you can execute the SQL script `create-database.sql` to create the data structures.
 
 ```bash
@@ -82,6 +84,7 @@ $ psql --host=localhost --port=5432 --dbname=rustwebdev --username=firstdev --pa
 
 ```
 
+### Section 7.6 
 From section 7.6, you can work with SQL migrations. First, delete the existing data structures:
 
 ```bash
@@ -90,8 +93,27 @@ $ psql --host=localhost --port=5432 --dbname=rustwebdev --username=firstdev --pa
 
 ```
 
+To execute the `*-up` migrations scripts execute this command:
 
+```bash
+sqlx migrate run --database-url postgresql://firstdev:mypassword@localhost:5432/rustwebdev
+```
 
+To execute the `*-down` migration scripts execute this command:
 
+```bash
+sqlx migrate revert --database-url postgresql://firstdev:mypassword@localhost:5432/rustwebdev
+```
 
+Additionally, at the end of section 7.6 all `*-up` migrations will be executed when necessar before running the web application.
+
+```rust
+#[tokio::main]
+async fn main() {
+  ...
+  sqlx::migrate!().run(&store.clone().connection)
+  .await.expect("cannot run migration");
+  
+  ...
+```
 
